@@ -1,3 +1,15 @@
+"""Sprint 3 reporting service.
+
+This module is intentionally thin and reads from existing core models:
+- Book
+- Member
+- BorrowingRecord
+- User/Role context (indirectly through authenticated MainWindow flow)
+
+No separate fine table exists in the current schema. Penalty is modeled as a
+derived reporting value from `days_overdue` when needed for presentation.
+"""
+
 from datetime import date, datetime
 
 from sqlalchemy import desc, func, or_
@@ -33,6 +45,13 @@ def sync_overdue_records(db, reference_time=None):
         db.commit()
 
     return marked_overdue + reverted_to_active
+
+
+def estimate_penalty(days_overdue, daily_rate=0.0):
+    """Return a derived penalty estimate (not persisted in DB)."""
+    safe_days = max(0, int(days_overdue))
+    safe_rate = max(0.0, float(daily_rate))
+    return round(safe_days * safe_rate, 2)
 
 
 def fetch_dashboard_metrics(db):
@@ -124,6 +143,7 @@ def fetch_dashboard_metrics(db):
 
 
 def fetch_overdue_records(db, search_text="", min_days_overdue=1, limit=None):
+    """Read overdue borrowings by joining borrowing, member, and book models."""
     sync_overdue_records(db)
     now = datetime.utcnow()
 
@@ -178,6 +198,7 @@ def fetch_overdue_records(db, search_text="", min_days_overdue=1, limit=None):
                 "borrow_date": record.borrow_date,
                 "due_date": record.due_date,
                 "days_overdue": days_overdue,
+                "estimated_penalty": estimate_penalty(days_overdue),
                 "status": record.status,
             }
         )

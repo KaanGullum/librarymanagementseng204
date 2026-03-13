@@ -1,4 +1,7 @@
-from PySide6.QtCore import QDate, Qt
+import os
+
+from PySide6.QtCore import QDate, Qt, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QDateEdit,
@@ -103,8 +106,28 @@ class ReportsWidget(QWidget):
         )
         self.btn_refresh.clicked.connect(self.refresh_data)
 
+        self.btn_models = QPushButton("Sprint 3 System Models")
+        self.btn_models.setCursor(Qt.PointingHandCursor)
+        self.btn_models.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #eef2f7;
+                color: #2c3545;
+                border: 1px solid #d8dde6;
+                padding: 8px 12px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #e2e8f0;
+            }
+        """
+        )
+        self.btn_models.clicked.connect(self.open_system_models_doc)
+
         top_row.addLayout(title_box)
         top_row.addStretch()
+        top_row.addWidget(self.btn_models)
         top_row.addWidget(self.btn_refresh)
         layout.addLayout(top_row)
 
@@ -296,6 +319,16 @@ class ReportsWidget(QWidget):
     def refresh_data(self):
         self.load_overdue_table()
         self.generate_summary(silent_validation=True)
+
+    def open_system_models_doc(self):
+        project_root = os.path.dirname(os.path.dirname(__file__))
+        doc_path = os.path.join(project_root, "docs", "sprint3_system_models.md")
+
+        if not os.path.exists(doc_path):
+            QMessageBox.warning(self, "Missing Document", "Sprint 3 System Models document not found.")
+            return
+
+        QDesktopServices.openUrl(QUrl.fromLocalFile(doc_path))
 
     def load_overdue_table(self):
         db = SessionLocal()
