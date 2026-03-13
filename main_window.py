@@ -7,6 +7,8 @@ from PySide6.QtGui import QIcon
 
 from models import User, RoleEnum
 from views.user_management import UserManagementWidget
+from views.book_inventory import BookInventoryWidget
+from views.members import MemberManagementWidget
 
 class AccountInformationDialog(QDialog):
     def __init__(self, user: User, parent=None):
@@ -185,16 +187,19 @@ class MainWindow(QMainWindow):
         # Sidebar Buttons
         self.btn_dashboard = SidebarButton("  Dashboard")
         self.btn_books = SidebarButton("  Books")
+        self.btn_members = SidebarButton("  Members")
         self.btn_reports = SidebarButton("  Reports")
         self.btn_users = SidebarButton("  Users")
         
         self.btn_dashboard.clicked.connect(lambda: self.switch_view(0))
         self.btn_books.clicked.connect(lambda: self.switch_view(1))
-        self.btn_reports.clicked.connect(lambda: self.switch_view(2))
-        self.btn_users.clicked.connect(lambda: self.switch_view(3))
+        self.btn_members.clicked.connect(lambda: self.switch_view(2))
+        self.btn_reports.clicked.connect(lambda: self.switch_view(3))
+        self.btn_users.clicked.connect(lambda: self.switch_view(4))
 
         sidebar_layout.addWidget(self.btn_dashboard)
         sidebar_layout.addWidget(self.btn_books)
+        sidebar_layout.addWidget(self.btn_members)
         sidebar_layout.addWidget(self.btn_reports)
 
         if self.current_user.role == RoleEnum.ADMIN:
@@ -232,20 +237,22 @@ class MainWindow(QMainWindow):
 
         # Views
         self.dashboard_view = self.create_dashboard_view()
-        self.books_view = PlaceholderWidget("Books Inventory")
+        self.books_view = BookInventoryWidget()
+        self.members_view = MemberManagementWidget()
         self.reports_view = PlaceholderWidget("System Reports")
         
-        self.content_area.addWidget(self.dashboard_view)
-        self.content_area.addWidget(self.books_view)
-        self.content_area.addWidget(self.reports_view)
+        self.content_area.addWidget(self.dashboard_view) # 0
+        self.content_area.addWidget(self.books_view)     # 1
+        self.content_area.addWidget(self.members_view)   # 2
+        self.content_area.addWidget(self.reports_view)   # 3
         
         if self.current_user.role == RoleEnum.ADMIN:
             self.user_mgt_view = UserManagementWidget(self.current_user)
-            self.content_area.addWidget(self.user_mgt_view)
+            self.content_area.addWidget(self.user_mgt_view) # 4
 
         # Default View
         if self.current_user.role == RoleEnum.ADMIN:
-            self.switch_view(3) # Show Users by default like the image
+            self.switch_view(4) # Show Users by default like the image
         else:
             self.switch_view(0)
 
@@ -265,10 +272,11 @@ class MainWindow(QMainWindow):
         self.content_area.setCurrentIndex(index)
         self.btn_dashboard.setChecked(index == 0)
         self.btn_books.setChecked(index == 1)
-        self.btn_reports.setChecked(index == 2)
+        self.btn_members.setChecked(index == 2)
+        self.btn_reports.setChecked(index == 3)
         
         if self.current_user.role == RoleEnum.ADMIN:
-            self.btn_users.setChecked(index == 3)
+            self.btn_users.setChecked(index == 4)
 
     def show_account_info(self):
         dialog = AccountInformationDialog(self.current_user, self)
