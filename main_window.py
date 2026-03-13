@@ -3,12 +3,13 @@ from PySide6.QtWidgets import (
     QPushButton, QStackedWidget, QLabel, QFrame, QDialog
 )
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QIcon
 
 from models import User, RoleEnum
+from views.dashboard import DashboardWidget
 from views.user_management import UserManagementWidget
 from views.book_inventory import BookInventoryWidget
 from views.members import MemberManagementWidget
+from views.reports import ReportsWidget
 
 class AccountInformationDialog(QDialog):
     def __init__(self, user: User, parent=None):
@@ -123,18 +124,6 @@ class SidebarButton(QPushButton):
         self.setCheckable(True)
         self.setCursor(Qt.PointingHandCursor)
 
-class PlaceholderWidget(QWidget):
-    def __init__(self, title):
-        super().__init__()
-        layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignCenter)
-        lbl = QLabel(f"{title} (Coming Soon)")
-        font = lbl.font()
-        font.setPointSize(24)
-        lbl.setFont(font)
-        lbl.setStyleSheet("color: #3b4b61;")
-        layout.addWidget(lbl)
-
 class MainWindow(QMainWindow):
     logout_requested = Signal()
 
@@ -236,10 +225,10 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.content_area)
 
         # Views
-        self.dashboard_view = self.create_dashboard_view()
+        self.dashboard_view = DashboardWidget()
         self.books_view = BookInventoryWidget()
         self.members_view = MemberManagementWidget()
-        self.reports_view = PlaceholderWidget("System Reports")
+        self.reports_view = ReportsWidget()
         
         self.content_area.addWidget(self.dashboard_view) # 0
         self.content_area.addWidget(self.books_view)     # 1
@@ -256,20 +245,12 @@ class MainWindow(QMainWindow):
         else:
             self.switch_view(0)
 
-    def create_dashboard_view(self):
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        label = QLabel("Welcome to the Library Management Dashboard!")
-        label.setAlignment(Qt.AlignCenter)
-        font = label.font()
-        font.setPointSize(20)
-        label.setFont(font)
-        label.setStyleSheet("color: #3b4b61;")
-        layout.addWidget(label)
-        return widget
-
     def switch_view(self, index):
         self.content_area.setCurrentIndex(index)
+        current_widget = self.content_area.currentWidget()
+        if hasattr(current_widget, "refresh_data"):
+            current_widget.refresh_data()
+
         self.btn_dashboard.setChecked(index == 0)
         self.btn_books.setChecked(index == 1)
         self.btn_members.setChecked(index == 2)

@@ -9,6 +9,7 @@ from datetime import datetime
 
 from database import SessionLocal
 from models import Member, BorrowingRecord, BorrowStatusEnum, BookStatusEnum, Book
+from reporting import sync_overdue_records
 from views.borrowing import BorrowBookDialog
 
 class MemberDialog(QDialog):
@@ -354,6 +355,7 @@ class MemberManagementWidget(QWidget):
         
         db = SessionLocal()
         try:
+            sync_overdue_records(db)
             records = db.query(BorrowingRecord).filter(BorrowingRecord.member_id == member_id).order_by(BorrowingRecord.borrow_date.desc()).all()
             
             for row, record in enumerate(records):
