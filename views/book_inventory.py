@@ -31,6 +31,12 @@ class BookDialog(QDialog):
                 border-radius: 4px;
                 padding: 4px;
             }
+            QComboBox QAbstractItemView {
+                background-color: white;
+                color: #333;
+                selection-background-color: #0078D7;
+                selection-color: white;
+            }
             QPushButton {
                 background-color: #3b4b61;
                 color: white;
@@ -170,9 +176,15 @@ class BookInventoryWidget(QWidget):
         add_btn.setCursor(Qt.PointingHandCursor)
         add_btn.clicked.connect(self.show_add_book_dialog)
 
+        del_btn = QPushButton("Delete Book")
+        del_btn.setStyleSheet("background-color: #c9302c; color: white; padding: 8px 15px; border-radius: 3px; font-weight: bold;")
+        del_btn.setCursor(Qt.PointingHandCursor)
+        del_btn.clicked.connect(self.delete_selected_book)
+
         top_bar.addWidget(title_label)
         top_bar.addStretch()
         top_bar.addWidget(add_btn)
+        top_bar.addWidget(del_btn)
 
         layout.addLayout(top_bar)
 
@@ -290,3 +302,41 @@ class BookInventoryWidget(QWidget):
                     self.load_books()
         finally:
             db.close()
+
+    def delete_selected_book(self):
+        selected_rows = self.table.selectedItems()
+        if not selected_rows:
+            QMessageBox.warning(self, "Selection Error", "Please select a book to delete by clicking on its row.")
+            return
+            
+        book_id = int(self.table.item(selected_rows[0].row(), 0).text())
+        title = self.table.item(selected_rows[0].row(), 2).text()
+        
+        reply = QMessageBox.question(
+            self, 'Confirm Deletion',
+            f"Are you sure you want to delete the book: '{title}'?\n\nThis will also permanently remove any past returned borrowing records associated with this book.",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            db = SessionLocal()
+            try:
+                book = db.query(Book).filter(Book.id == book_id).first()
+                if book:
+                    # Check if there are active borrowings (can't delete if currently being borrowed)
+                    active_borrows = any(b.status.name == "ACTIVE" for b in book.borrowings)
+                    if active_borrows:
+                        QMessageBox.warning(self, "Cannot Delete", f"Cannot delete '{title}' because there are active borrowings for it. Please make sure all copies are returned first.")
+                        return
+                    
+                    db.delete(book)
+                    db.commit()
+                    QMessageBox.information(self, "Success", f"Book '{title}' has been successfully deleted.")
+                    self.load_books()
+                else:
+                    QMessageBox.warning(self, "Error", "Book not found.")
+            except Exception as e:
+                db.rollback()
+                QMessageBox.critical(self, "Error", f"Failed to delete book: {str(e)}")
+            finally:
+                db.close()
