@@ -3,6 +3,7 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QTimer
 from models import User, RoleEnum
 from main_window import MainWindow
+from theme import apply_light_theme, configure_qt_for_light_mode
 
 def take_screenshots():
     # 1. Books tab (index 1)
@@ -17,7 +18,9 @@ def take_screenshots():
     app.quit()
 
 if __name__ == "__main__":
+    configure_qt_for_light_mode()
     app = QApplication(sys.argv)
+    apply_light_theme(app)
     
     # Mock Admin User
     admin_user = User(username="admin_tester", role=RoleEnum.ADMIN)

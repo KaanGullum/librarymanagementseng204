@@ -57,8 +57,8 @@ class MemberDialog(QDialog):
         if self.member:
             self.first_name_input.setText(self.member.first_name)
             self.last_name_input.setText(self.member.last_name)
-            self.email_input.setText(self.member.email)
-            self.phone_input.setText(self.member.phone)
+            self.email_input.setText(self.member.email or "")
+            self.phone_input.setText(self.member.phone or "")
 
         form_layout.addRow("First Name:", self.first_name_input)
         form_layout.addRow("Last Name:", self.last_name_input)
@@ -82,7 +82,8 @@ class MemberDialog(QDialog):
     def save_member(self):
         first_name = self.first_name_input.text().strip()
         last_name = self.last_name_input.text().strip()
-        email = self.email_input.text().strip()
+        email = self.email_input.text().strip() or None
+        phone = self.phone_input.text().strip() or None
         
         if not first_name or not last_name:
             QMessageBox.warning(self, "Validation Error", "First and Last Name are required.")
@@ -98,13 +99,13 @@ class MemberDialog(QDialog):
                 member.first_name = first_name
                 member.last_name = last_name
                 member.email = email
-                member.phone = self.phone_input.text().strip()
+                member.phone = phone
             else: # Create mode
                 new_member = Member(
                     first_name=first_name,
                     last_name=last_name,
                     email=email,
-                    phone=self.phone_input.text().strip(),
+                    phone=phone,
                     membership_date=datetime.utcnow()
                 )
                 db.add(new_member)

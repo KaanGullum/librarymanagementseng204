@@ -86,6 +86,7 @@ class BorrowBookDialog(QDialog):
     def load_members(self):
         db = SessionLocal()
         try:
+            self.member_combo.clear()
             members = db.query(Member).all()
             for member in members:
                 self.member_combo.addItem(f"{member.first_name} {member.last_name}", userData=member.id)
@@ -95,6 +96,7 @@ class BorrowBookDialog(QDialog):
     def load_available_books(self):
         db = SessionLocal()
         try:
+            self.book_combo.clear()
             books = db.query(Book).filter(Book.status == BookStatusEnum.AVAILABLE, Book.stock > 0).all()
             for book in books:
                 self.book_combo.addItem(f"{book.title} ({book.isbn})", userData=book.id)

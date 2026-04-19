@@ -8,6 +8,7 @@ from PySide6.QtGui import QFont, QIcon
 from database import SessionLocal
 from models import User
 from auth import verify_password
+from theme import apply_light_theme, configure_qt_for_light_mode
 
 
 class LoginWindow(QWidget):
@@ -101,7 +102,9 @@ class LoginWindow(QWidget):
 
 if __name__ == "__main__":
     import sys
+    configure_qt_for_light_mode()
     app = QApplication(sys.argv)
+    apply_light_theme(app)
     window = LoginWindow()
     window.show()
     sys.exit(app.exec())

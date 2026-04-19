@@ -1,3 +1,5 @@
+import re
+
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QLineEdit, QTableWidget, QTableWidgetItem,
@@ -9,6 +11,43 @@ from sqlalchemy.exc import IntegrityError
 
 from database import SessionLocal
 from models import Book, BookStatusEnum
+from theme import build_spinbox_stylesheet
+
+
+def normalize_isbn(isbn: str) -> str:
+    return re.sub(r"[\s-]", "", isbn or "").upper()
+
+
+def sanitize_isbn_for_storage(isbn: str) -> str:
+    return re.sub(r"\s+", "", isbn or "").upper()
+
+
+def is_valid_isbn(isbn: str) -> bool:
+    normalized = normalize_isbn(isbn)
+
+    if len(normalized) == 10:
+        if not normalized[:-1].isdigit() or not (normalized[-1].isdigit() or normalized[-1] == "X"):
+            return False
+
+        total = 0
+        for index, char in enumerate(normalized):
+            value = 10 if char == "X" else int(char)
+            total += (10 - index) * value
+        return total % 11 == 0
+
+    if len(normalized) == 13:
+        if not normalized.isdigit():
+            return False
+
+        total = 0
+        for index, char in enumerate(normalized[:12]):
+            multiplier = 1 if index % 2 == 0 else 3
+            total += int(char) * multiplier
+        check_digit = (10 - (total % 10)) % 10
+        return check_digit == int(normalized[-1])
+
+    return False
+
 
 class BookDialog(QDialog):
     def __init__(self, book=None, parent=None):
@@ -20,12 +59,12 @@ class BookDialog(QDialog):
             QDialog {
                 background-color: white;
             }
-            QLabel, QLineEdit, QComboBox, QSpinBox {
+            QLabel, QLineEdit, QComboBox {
                 color: #333;
                 font-family: 'Segoe UI', sans-serif;
                 font-size: 13px;
             }
-            QLineEdit, QComboBox, QSpinBox {
+            QLineEdit, QComboBox {
                 background-color: white;
                 border: 1px solid #ced4da;
                 border-radius: 4px;
@@ -47,13 +86,14 @@ class BookDialog(QDialog):
             QPushButton:hover {
                 background-color: #2c3545;
             }
-        """)
+        """ + build_spinbox_stylesheet())
 
         layout = QVBoxLayout(self)
 
         form_layout = QFormLayout()
         
         self.isbn_input = QLineEdit()
+        self.isbn_input.setMaximumWidth(140)
         self.title_input = QLineEdit()
         self.author_input = QLineEdit()
         self.category_input = QLineEdit()
@@ -69,11 +109,23 @@ class BookDialog(QDialog):
             self.isbn_input.setText(self.book.isbn)
             self.title_input.setText(self.book.title)
             self.author_input.setText(self.book.author)
-            self.category_input.setText(self.book.category)
+            self.category_input.setText(self.book.category or "")
             self.stock_input.setValue(self.book.stock)
             self.status_combo.setCurrentText(self.book.status.value)
 
-        form_layout.addRow("ISBN:", self.isbn_input)
+        isbn_row = QWidget()
+        isbn_row_layout = QHBoxLayout(isbn_row)
+        isbn_row_layout.setContentsMargins(0, 0, 0, 0)
+        isbn_row_layout.setSpacing(8)
+
+        isbn_format_label = QLabel("978-975-07-0056-9")
+        isbn_format_label.setStyleSheet("color: #64748b; font-size: 12px;")
+
+        isbn_row_layout.addWidget(self.isbn_input)
+        isbn_row_layout.addWidget(isbn_format_label)
+        isbn_row_layout.addStretch()
+
+        form_layout.addRow("ISBN:", isbn_row)
         form_layout.addRow("Title:", self.title_input)
         form_layout.addRow("Author:", self.author_input)
         form_layout.addRow("Category:", self.category_input)
@@ -95,20 +147,38 @@ class BookDialog(QDialog):
         layout.addLayout(btn_layout)
 
     def save_book(self):
-        isbn = self.isbn_input.text().strip()
+        isbn = sanitize_isbn_for_storage(self.isbn_input.text().strip())
         title = self.title_input.text().strip()
         author = self.author_input.text().strip()
+        category = self.category_input.text().strip() or None
         
         if not isbn or not title or not author:
             QMessageBox.warning(self, "Validation Error", "ISBN, Title, and Author are required fields.")
             return
             
-        if len(isbn) < 5:
-            QMessageBox.warning(self, "Validation Error", "Please enter a valid ISBN.")
+        if not is_valid_isbn(isbn):
+            QMessageBox.warning(
+                self,
+                "Validation Error",
+                "Please enter a valid ISBN-10 or ISBN-13. You may use digits with optional hyphens, for example 978-975-07-0056-9."
+            )
             return
 
         db = SessionLocal()
         try:
+            duplicate_book = next(
+                (
+                    existing_book
+                    for existing_book in db.query(Book).all()
+                    if normalize_isbn(existing_book.isbn) == normalize_isbn(isbn)
+                    and (not self.book or existing_book.id != self.book.id)
+                ),
+                None,
+            )
+            if duplicate_book:
+                QMessageBox.warning(self, "Database Error", "A book with this ISBN already exists.")
+                return
+
             if self.book: # Edit mode
                 book = db.query(Book).filter(Book.id == self.book.id).first()
                 if not book:
@@ -117,7 +187,7 @@ class BookDialog(QDialog):
                 book.isbn = isbn
                 book.title = title
                 book.author = author
-                book.category = self.category_input.text().strip()
+                book.category = category
                 book.stock = self.stock_input.value()
                 book.status = BookStatusEnum(self.status_combo.currentText())
             else: # Create mode
@@ -125,7 +195,7 @@ class BookDialog(QDialog):
                     isbn=isbn,
                     title=title,
                     author=author,
-                    category=self.category_input.text().strip(),
+                    category=category,
                     stock=self.stock_input.value(),
                     status=BookStatusEnum(self.status_combo.currentText())
                 )
@@ -234,6 +304,9 @@ class BookInventoryWidget(QWidget):
         search_layout.addWidget(self.btn_clear)
         layout.addLayout(search_layout)
 
+    def refresh_data(self):
+        self.load_books()
+
     def load_books(self):
         search_term = self.search_input.text().strip()
         db = SessionLocal()
@@ -262,9 +335,9 @@ class BookInventoryWidget(QWidget):
                 self.table.setItem(row, 3, QTableWidgetItem(book.author))
                 self.table.setItem(row, 4, QTableWidgetItem(book.category or ""))
                 
-                # Calculate Total Copies: available stock + currently active borrowings
-                active_borrowings = sum(1 for bw in book.borrowings if bw.status.name == "ACTIVE")
-                total_copies = book.stock + active_borrowings
+                # Total copies are available stock plus every copy that is still out.
+                open_borrowings = sum(1 for bw in book.borrowings if bw.return_date is None)
+                total_copies = book.stock + open_borrowings
                 
                 self.table.setItem(row, 5, QTableWidgetItem(str(total_copies)))
                 self.table.setItem(row, 6, QTableWidgetItem(str(book.stock))) # Available copies
@@ -323,10 +396,10 @@ class BookInventoryWidget(QWidget):
             try:
                 book = db.query(Book).filter(Book.id == book_id).first()
                 if book:
-                    # Check if there are active borrowings (can't delete if currently being borrowed)
-                    active_borrows = any(b.status.name == "ACTIVE" for b in book.borrowings)
-                    if active_borrows:
-                        QMessageBox.warning(self, "Cannot Delete", f"Cannot delete '{title}' because there are active borrowings for it. Please make sure all copies are returned first.")
+                    # Any unreturned borrowing means the book is still out and must not be deleted.
+                    has_open_borrows = any(b.return_date is None for b in book.borrowings)
+                    if has_open_borrows:
+                        QMessageBox.warning(self, "Cannot Delete", f"Cannot delete '{title}' because there are open borrowings for it. Please make sure all copies are returned first.")
                         return
                     
                     db.delete(book)

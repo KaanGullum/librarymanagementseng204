@@ -1,7 +1,4 @@
-import os
-
-from PySide6.QtCore import QDate, Qt, QUrl
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import QDate, Qt
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QDateEdit,
@@ -23,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from database import SessionLocal
 from reporting import fetch_borrowing_summary, fetch_overdue_records, validate_summary_range
+from theme import build_spinbox_stylesheet
 
 
 class MiniStatCard(QFrame):
@@ -106,35 +104,16 @@ class ReportsWidget(QWidget):
         )
         self.btn_refresh.clicked.connect(self.refresh_data)
 
-        self.btn_models = QPushButton("Sprint 3 System Models")
-        self.btn_models.setCursor(Qt.PointingHandCursor)
-        self.btn_models.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #eef2f7;
-                color: #2c3545;
-                border: 1px solid #d8dde6;
-                padding: 8px 12px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #e2e8f0;
-            }
-        """
-        )
-        self.btn_models.clicked.connect(self.open_system_models_doc)
-
         top_row.addLayout(title_box)
         top_row.addStretch()
-        top_row.addWidget(self.btn_models)
         top_row.addWidget(self.btn_refresh)
         layout.addLayout(top_row)
 
         filter_frame = QFrame()
+        filter_frame.setObjectName("ReportsFilterFrame")
         filter_frame.setStyleSheet(
             """
-            QFrame {
+            QFrame#ReportsFilterFrame {
                 background-color: white;
                 border: 1px solid #d8dde6;
                 border-radius: 8px;
@@ -142,13 +121,13 @@ class ReportsWidget(QWidget):
             QLabel {
                 color: #2c3545;
             }
-            QLineEdit, QSpinBox, QDateEdit {
+            QLineEdit, QDateEdit {
                 border: 1px solid #ced4da;
                 border-radius: 4px;
                 padding: 5px;
                 background-color: #ffffff;
             }
-        """
+        """ + build_spinbox_stylesheet()
         )
         filter_layout = QGridLayout(filter_frame)
         filter_layout.setContentsMargins(12, 12, 12, 12)
@@ -232,15 +211,13 @@ class ReportsWidget(QWidget):
         layout.addWidget(self.overdue_table)
 
         summary_frame = QFrame()
+        summary_frame.setObjectName("ReportsSummaryFrame")
         summary_frame.setStyleSheet(
             """
-            QFrame {
+            QFrame#ReportsSummaryFrame {
                 background-color: white;
                 border: 1px solid #d8dde6;
                 border-radius: 8px;
-            }
-            QLabel {
-                color: #2c3545;
             }
             QDateEdit {
                 border: 1px solid #ced4da;
@@ -252,20 +229,20 @@ class ReportsWidget(QWidget):
         )
         summary_layout = QVBoxLayout(summary_frame)
         summary_layout.setContentsMargins(12, 12, 12, 12)
-        summary_layout.setSpacing(8)
+        summary_layout.setSpacing(10)
 
         summary_title = QLabel("Borrowing Summary")
-        summary_title_font = summary_title.font()
-        summary_title_font.setPointSize(16)
-        summary_title_font.setBold(True)
-        summary_title.setFont(summary_title_font)
+        summary_title.setStyleSheet("color: #2c3545; font-size: 16px; font-weight: bold;")
 
         summary_subtitle = QLabel("Validate range and generate summary metrics")
-        summary_subtitle.setStyleSheet("color: #64748b;")
+        summary_subtitle.setStyleSheet("color: #64748b; font-size: 12px;")
 
         date_row = QHBoxLayout()
+        date_row.setSpacing(12)
         date_form = QFormLayout()
         date_form.setLabelAlignment(Qt.AlignLeft)
+        date_form.setHorizontalSpacing(10)
+        date_form.setVerticalSpacing(10)
 
         self.start_date_edit = QDateEdit()
         self.start_date_edit.setCalendarPopup(True)
@@ -280,7 +257,7 @@ class ReportsWidget(QWidget):
         date_form.addRow("End Date:", self.end_date_edit)
         date_row.addLayout(date_form)
 
-        self.btn_generate_summary = QPushButton("Validate & Generate")
+        self.btn_generate_summary = QPushButton("Generate Summary")
         self.btn_generate_summary.setCursor(Qt.PointingHandCursor)
         self.btn_generate_summary.setStyleSheet(
             """
@@ -288,7 +265,7 @@ class ReportsWidget(QWidget):
                 background-color: #14532d;
                 color: white;
                 border-radius: 4px;
-                padding: 8px 15px;
+                padding: 10px 18px;
                 font-weight: bold;
             }
             QPushButton:hover {
@@ -301,8 +278,21 @@ class ReportsWidget(QWidget):
         date_row.addStretch()
         date_row.addWidget(self.btn_generate_summary)
 
-        self.summary_results = QLabel("No summary generated yet.")
-        self.summary_results.setStyleSheet("color: #334155; font-size: 12px;")
+        self.summary_results = QLabel("Select a date range and click Generate Summary.")
+        self.summary_results.setStyleSheet(
+            """
+            QLabel {
+                background-color: #f8fafc;
+                border: 1px solid #d8dde6;
+                border-radius: 6px;
+                color: #334155;
+                font-size: 12px;
+                padding: 10px;
+            }
+            """
+        )
+        self.summary_results.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.summary_results.setMinimumHeight(110)
         self.summary_results.setWordWrap(True)
 
         summary_layout.addWidget(summary_title)
@@ -319,16 +309,6 @@ class ReportsWidget(QWidget):
     def refresh_data(self):
         self.load_overdue_table()
         self.generate_summary(silent_validation=True)
-
-    def open_system_models_doc(self):
-        project_root = os.path.dirname(os.path.dirname(__file__))
-        doc_path = os.path.join(project_root, "docs", "sprint3_system_models.md")
-
-        if not os.path.exists(doc_path):
-            QMessageBox.warning(self, "Missing Document", "Sprint 3 System Models document not found.")
-            return
-
-        QDesktopServices.openUrl(QUrl.fromLocalFile(doc_path))
 
     def load_overdue_table(self):
         db = SessionLocal()
@@ -372,7 +352,11 @@ class ReportsWidget(QWidget):
         if not is_valid:
             if not silent_validation:
                 QMessageBox.warning(self, "Validation Error", message)
-            self.summary_results.setText(f"Validation failed: {message}")
+            self.summary_results.setText(
+                "Validation Error\n"
+                f"{message}\n\n"
+                "Please correct the selected dates and try again."
+            )
             return
 
         db = SessionLocal()
@@ -381,13 +365,21 @@ class ReportsWidget(QWidget):
         finally:
             db.close()
 
+        top_book_title = summary["top_book_title"]
+        top_book_borrows = summary["top_book_borrows"]
+        if top_book_title == "N/A" or top_book_borrows == 0:
+            top_book_text = "No borrowing activity in this range."
+        else:
+            top_book_text = f"{top_book_title} ({top_book_borrows} borrows)"
+
         summary_text = (
-            f"Range: {start_date.isoformat()} to {end_date.isoformat()} | "
-            f"Issued: {summary['issued_count']} | Returned: {summary['returned_count']} | "
-            f"Currently Open: {summary['current_open_loans']} | "
-            f"Overdue Started in Range: {summary['overdue_started_in_range']} | "
-            f"New Members: {summary['new_members']} | "
-            f"Return Rate: %{summary['return_rate']} | "
-            f"Top Book: {summary['top_book_title']} ({summary['top_book_borrows']})"
+            f"Selected Range: {start_date.isoformat()} to {end_date.isoformat()}\n"
+            f"Issued Books: {summary['issued_count']}\n"
+            f"Returned Books: {summary['returned_count']}\n"
+            f"Currently Open Loans: {summary['current_open_loans']}\n"
+            f"Overdue Started In Range: {summary['overdue_started_in_range']}\n"
+            f"New Members: {summary['new_members']}\n"
+            f"Return Rate: {summary['return_rate']}%\n"
+            f"Top Book: {top_book_text}"
         )
         self.summary_results.setText(summary_text)

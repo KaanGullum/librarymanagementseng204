@@ -1,12 +1,16 @@
 import sys
 from PySide6.QtWidgets import QApplication
 
+from database import init_db
 from login_window import LoginWindow
 from main_window import MainWindow
+from theme import apply_light_theme, configure_qt_for_light_mode
 
 class AppController:
     def __init__(self):
+        configure_qt_for_light_mode()
         self.app = QApplication(sys.argv)
+        apply_light_theme(self.app)
         self.app.setStyleSheet("""
             QDialog, QMessageBox {
                 background-color: white;
@@ -53,5 +57,6 @@ class AppController:
         self.main_window.show()
 
 if __name__ == "__main__":
+    init_db()
     controller = AppController()
     controller.start()
